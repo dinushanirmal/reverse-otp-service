@@ -13,14 +13,6 @@ app:
     request-id-length: 16
     suffix-length: 48
 
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    operationsSorter: method
-    tagsSorter: alpha
-  api-docs:
-    path: /v3/api-docs
-
 management:
   endpoints:
     web:

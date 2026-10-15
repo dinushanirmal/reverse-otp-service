@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reverse OTP Service - API Documentation</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --border: #334155;
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --code-bg: #090d16;
+            --success: #4ade80;
+            --warning: #fbbf24;
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #f8fafc;
+                --card-bg: #ffffff;
+                --border: #e2e8f0;
+                --text: #0f172a;
+                --text-muted: #64748b;
+                --accent: #0284c7;
+                --code-bg: #f1f5f9;
+                --success: #16a34a;
+                --warning: #d97706;
+            }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            margin: 0;
+            padding: 24px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1 {
+            margin: 0 0 10px 0;
+            font-size: 2rem;
+            color: var(--accent);
+        }
+        .meta-bar {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .meta-bar a {
+            color: var(--accent);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .meta-bar a:hover {
+            text-decoration: underline;
+        }
+        .endpoint-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        .endpoint-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .method {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+        }
+        .method.post { background: #0284c7; color: #fff; }
+        .method.get { background: #16a34a; color: #fff; }
+        .path {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 14px;
+            overflow-x: auto;
+            font-size: 0.9rem;
+            line-height: 1.45;
+        }
+        code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 0.9em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+            font-size: 0.9rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+        }
+        th {
+            background: var(--code-bg);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-approved { background: #dcfce7; color: #166534; }
+        .badge-expired { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Reverse OTP Verification Service</h1>
+        <div class="meta-bar">
+            <span><strong>Version:</strong> 1.0.0</span>
+            <span><strong>Protocol:</strong> REST JSON</span>
+            <span><strong>Cloud Run Ready:</strong> Yes</span>
+            <span><a href="/docs.md">📄 View Raw Markdown (for Agents / LLMs)</a></span>
+            <span><a href="/actuator/health">❤️ Health Status</a></span>
+        </div>
+    </header>
+
+    <section>
+        <h2>Protocol Overview</h2>
+        <p>This service verifies a user's mobile number via Mobile-Originated (MO) SMS:</p>
+        <ol>
+            <li><strong>Client requests token:</strong> Generates a 64-character pure hex token where the <strong>first 16 characters are the Request ID</strong>.</li>
+            <li><strong>User sends SMS:</strong> The user sends an SMS containing the token to the telco gateway shortcode.</li>
+            <li><strong>Telco notifies webhook:</strong> Telco sends the SMS content and sender's number. The service matches against pending requests and updates status to <code>APPROVED</code>.</li>
+            <li><strong>Client polls status:</strong> Client checks verification status using the 16-character Request ID.</li>
+        </ol>
+    </section>
+
+    <section>
+        <h2>API Endpoints</h2>
+
+        <!-- Endpoint 1 -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v1/tokens/generate</span>
+            </div>
+            <p>Generates a new 64-character hex reverse OTP token and stores it in <code>token_requests</code> table.</p>
+            
+            <h4>Request Body</h4>
+            <pre><code>{
+  "phoneNumber": "+94771234567"
+}</code></pre>
+
+            <h4>Response (201 Created)</h4>
+            <pre><code>{
+  "requestId": "40661646BA0DE70E",
+  "token": "40661646BA0DE70E3E8DD12992E7D1580D898767669A9583DAB6096B93F0FC92",
+  "phoneNumber": "+94771234567",
+  "smsContent": "Your verification token is: 40661646BA0DE70E3E8DD12992E7D1580D898767669A9583DAB6096B93F0FC92",
+  "expiresAt": "2026-10-15T09:47:53.912Z"
+}</code></pre>
+        </div>
+
+        <!-- Endpoint 2 -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method post">POST</span>
+                <span class="path">/api/v1/webhooks/telco/sms</span>
+            </div>
+            <p>Called by Telco provider SMS gateways. Stores incoming message into <code>incoming_messages</code>, extracts the 16-character Request ID, matches against pending tokens for the sender's phone, marks as <code>APPROVED</code>, and responds with a standard acknowledgment.</p>
+
+            <h4>Request Body</h4>
+            <pre><code>{
+  "sender": "+94771234567",
+  "message": "40661646BA0DE70E3E8DD12992E7D1580D898767669A9583DAB6096B93F0FC92"
+}</code></pre>
+            <p><small>Accepted aliases for <code>sender</code>: <code>from</code>, <code>senderNumber</code>, <code>msisdn</code>, <code>mobile</code>. Aliases for <code>message</code>: <code>content</code>, <code>text</code>, <code>body</code>, <code>sms</code>.</small></p>
+
+            <h4>Response (200 OK)</h4>
+            <pre><code>{
+  "status": "RECEIVED",
+  "message": "SMS received successfully"
+}</code></pre>
+        </div>
+
+        <!-- Endpoint 3 -->
+        <div class="endpoint-card">
+            <div class="endpoint-header">
+                <span class="method get">GET</span>
+                <span class="path">/api/v1/tokens/{requestId}/status</span>
+            </div>
+            <p>Retrieves the verification status and mobile number for a given 16-character Request ID.</p>
+
+            <h4>Response (200 OK)</h4>
+            <pre><code>{
+  "requestId": "40661646BA0DE70E",
+  "phoneNumber": "+94771234567",
+  "status": "APPROVED",
+  "createdAt": "2026-10-15T09:42:53.912Z",
+  "expiresAt": "2026-10-15T09:47:53.912Z",
+  "verifiedAt": "2026-10-15T09:43:04.245Z"
+}</code></pre>
+
+            <h4>Status Values</h4>
+            <table>
+                <thead>
+                    <tr><th>Status</th><th>Description</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="badge badge-pending">PENDING</span></td><td>Token created, waiting for incoming SMS.</td></tr>
+                    <tr><td><span class="badge badge-approved">APPROVED</span></td><td>SMS matched and verified successfully.</td></tr>
+                    <tr><td><span class="badge badge-expired">EXPIRED</span></td><td>Token TTL elapsed before matching SMS arrived.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>Agent Quick Integration via cURL</h2>
+        <pre><code># 1. Generate Token
+curl -X POST http://localhost:8080/api/v1/tokens/generate \
+  -H "Content-Type: application/json" \
+  -d '{"phoneNumber": "+94771234567"}'
+
+# 2. Check Status
+curl http://localhost:8080/api/v1/tokens/{requestId}/status
+
+# 3. Simulate Webhook
+curl -X POST http://localhost:8080/api/v1/webhooks/telco/sms \
+  -H "Content-Type: application/json" \
+  -d '{"sender": "+94771234567", "message": "{token}"}'</code></pre>
+    </section>
+</div>
+</body>
+</html>

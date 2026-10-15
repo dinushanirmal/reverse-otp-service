@@ -1,14 +1,8 @@
 package com.example.reverseotp.dto.response;
 
-import io.swagger.v3.oas.annotations.media.Schema;
-
-@Schema(description = "Simple acknowledgment response for telco SMS webhook")
 public class TelcoWebhookResponse {
 
-    @Schema(description = "Processing status", example = "RECEIVED")
     private String status;
-
-    @Schema(description = "Message description", example = "SMS received successfully")
     private String message;
 
     public TelcoWebhookResponse() {

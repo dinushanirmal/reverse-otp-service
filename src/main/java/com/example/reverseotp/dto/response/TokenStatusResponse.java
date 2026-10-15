@@ -1,28 +1,15 @@
 package com.example.reverseotp.dto.response;
 
 import com.example.reverseotp.entity.TokenStatus;
-import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 
-@Schema(description = "Verification status and details of a requested token")
 public class TokenStatusResponse {
 
-    @Schema(description = "16-character unique Request ID", example = "A1B2C3D4E5F67890")
     private String requestId;
-
-    @Schema(description = "Associated mobile number", example = "+94771234567")
     private String phoneNumber;
-
-    @Schema(description = "Current token verification status", example = "APPROVED")
     private TokenStatus status;
-
-    @Schema(description = "Timestamp when token request was created")
     private Instant createdAt;
-
-    @Schema(description = "Timestamp when token expires")
     private Instant expiresAt;
-
-    @Schema(description = "Timestamp when token was successfully verified (null if pending/expired)")
     private Instant verifiedAt;
 
     public TokenStatusResponse() {
