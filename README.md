@@ -187,3 +187,9 @@ gcloud run deploy reverse-otp-service \
 ```
 
 > **Note on H2 in Cloud Run:** When using in-memory H2, set `--min-instances 1` and `--max-instances 1` to ensure state is maintained within a single active container instance.
+
+---
+
+## 📱 Client SDKs & Future Roadmap
+
+- [Flutter SDK Architecture & Roadmap](file:///d:/projects/reverse-otp-service/FLUTTER_SDK_ROADMAP.md) - Design specification for mobile banking and high-assurance SIM/device binding on Android & iOS.
