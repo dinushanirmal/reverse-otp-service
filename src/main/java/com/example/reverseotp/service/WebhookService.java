@@ -86,7 +86,7 @@ public class WebhookService {
         TokenRequest tokenRequest = tokenOpt.get();
 
         // Check if token has expired
-        if (receivedAt.isAfter(tokenRequest.getExpiresAt())) {
+        if (tokenRequest.getStatus() == TokenStatus.EXPIRED || receivedAt.isAfter(tokenRequest.getExpiresAt())) {
             tokenRequest.setStatus(TokenStatus.EXPIRED);
             tokenRequestRepository.save(tokenRequest);
 

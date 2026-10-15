@@ -30,6 +30,9 @@ public class TokenService {
     @Value("${app.token.ttl-minutes:5}")
     private long ttlMinutes;
 
+    @Value("${app.token.ttl-seconds:0}")
+    private long ttlSeconds;
+
     @Value("${app.token.request-id-length:16}")
     private int requestIdLength;
 
@@ -38,6 +41,13 @@ public class TokenService {
 
     public TokenService(TokenRequestRepository tokenRequestRepository) {
         this.tokenRequestRepository = tokenRequestRepository;
+    }
+
+    private Duration getTokenTtl() {
+        if (ttlSeconds > 0) {
+            return Duration.ofSeconds(ttlSeconds);
+        }
+        return Duration.ofMinutes(ttlMinutes);
     }
 
     /**
@@ -57,7 +67,7 @@ public class TokenService {
         String fullToken = requestId + hexSuffix;
 
         Instant now = Instant.now();
-        Instant expiresAt = now.plus(Duration.ofMinutes(ttlMinutes));
+        Instant expiresAt = now.plus(getTokenTtl());
 
         TokenRequest tokenRequest = new TokenRequest(
                 requestId,
