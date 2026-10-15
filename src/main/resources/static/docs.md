@@ -25,11 +25,11 @@ sequenceDiagram
     Client->>API: POST /api/v1/tokens/generate { phoneNumber: "+94771234567" }
     API->>API: Generate 16-char requestId & 48-char hex suffix (64-char hex total)
     API->>DB: INSERT token_requests (requestId, token, status: PENDING, expiresAt: now+5m)
-    API-->>Client: 201 Created { requestId, token, smsContent: "<64-hex-token>" }
+    API-->>Client: 201 Created { requestId, token, recipientNumber: "+94703003332", smsContent: "<64-hex-token>" }
 
     Note over Client,User: 2. Mobile-Originated (MO) SMS Dispatch
-    Client->>User: Launch SMS intent (pre-fills plain 64-hex token to Telco shortcode)
-    User->>Telco: Send SMS (<64-hex-token>)
+    Client->>User: Launch SMS intent (pre-fills plain 64-hex token to +94703003332)
+    User->>Telco: Send SMS (<64-hex-token>) to +94703003332
 
     Note over Client,API: 3. Initial Polling
     Client->>API: GET /api/v1/tokens/{requestId}/status
@@ -66,6 +66,7 @@ sequenceDiagram
 * **Extraction Rule:** The service extracts `message.substring(0, 16)` to identify the request.
 * **SMS Compatibility:** 64 characters easily fits in standard 7-bit GSM SMS (limit 160 chars).
 * **Default TTL:** 5 minutes (Configurable via `app.token.ttl-minutes` or `app.token.ttl-seconds`).
+* **Recipient Number:** Configured in `app.token.recipient-number` (default: `+94703003332`).
 
 ---
 
@@ -94,10 +95,20 @@ Generates a 64-char token and registers a pending verification request.
   "requestId": "40661646BA0DE70E",
   "token": "40661646BA0DE70E3E8DD12992E7D1580D898767669A9583DAB6096B93F0FC92",
   "phoneNumber": "+94771234567",
+  "recipientNumber": "+94703003332",
   "smsContent": "40661646BA0DE70E3E8DD12992E7D1580D898767669A9583DAB6096B93F0FC92",
   "expiresAt": "2026-10-15T09:47:53.912Z"
 }
 ```
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `requestId` | String | Unique 16-character hex request ID |
+| `token` | String | Full 64-character hex verification token |
+| `phoneNumber` | String | Normalized user mobile number undergoing verification |
+| `recipientNumber` | String | Target mobile number / shortcode client must send the SMS to |
+| `smsContent` | String | Pre-formatted SMS body (plain 64-character token) |
+| `expiresAt` | String (ISO-8601) | Token expiration timestamp |
 
 ---
 

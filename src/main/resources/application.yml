@@ -28,6 +28,7 @@ app:
     request-id-length: 16
     suffix-length: 48
     sms-template: "%s"
+    recipient-number: "+94703003332"
 
 management:
   endpoints:

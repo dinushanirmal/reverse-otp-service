@@ -42,6 +42,9 @@ public class TokenService {
     @Value("${app.token.sms-template:%s}")
     private String smsTemplate;
 
+    @Value("${app.token.recipient-number:${app.token.receiver-number:+94703003332}}")
+    private String recipientNumber;
+
     public TokenService(TokenRequestRepository tokenRequestRepository) {
         this.tokenRequestRepository = tokenRequestRepository;
     }
@@ -82,14 +85,14 @@ public class TokenService {
         );
 
         tokenRequestRepository.save(tokenRequest);
-        log.info("Generated token request: requestId={}, phone={}, length={}, expiresAt={}",
-                requestId, normalizedPhone, fullToken.length(), expiresAt);
+        log.info("Generated token request: requestId={}, phone={}, recipientNumber={}, length={}, expiresAt={}",
+                requestId, normalizedPhone, recipientNumber, fullToken.length(), expiresAt);
 
         String smsContent = smsTemplate.contains("%s")
                 ? String.format(smsTemplate, fullToken)
                 : smsTemplate + fullToken;
 
-        return new GenerateTokenResponse(requestId, fullToken, normalizedPhone, smsContent, expiresAt);
+        return new GenerateTokenResponse(requestId, fullToken, normalizedPhone, recipientNumber, smsContent, expiresAt);
     }
 
     /**

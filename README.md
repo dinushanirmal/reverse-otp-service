@@ -33,11 +33,11 @@ sequenceDiagram
     Client->>API: POST /api/v1/tokens/generate { phoneNumber: "+94771234567" }
     API->>API: Generate 16-char requestId & 48-char hex suffix (64-char hex total)
     API->>DB: INSERT token_requests (requestId, token, status: PENDING, expiresAt: now+5m)
-    API-->>Client: 201 Created { requestId, token, smsContent: "<64-hex-token>" }
+    API-->>Client: 201 Created { requestId, token, recipientNumber: "+94703003332", smsContent: "<64-hex-token>" }
 
     Note over Client,User: 2. Mobile-Originated (MO) SMS Dispatch
-    Client->>User: Launch SMS intent (pre-fills plain 64-hex token to Telco shortcode)
-    User->>Telco: Send SMS (<64-hex-token>)
+    Client->>User: Launch SMS intent (pre-fills plain 64-hex token to +94703003332)
+    User->>Telco: Send SMS (<64-hex-token>) to +94703003332
 
     Note over Client,API: 3. Initial Polling
     Client->>API: GET /api/v1/tokens/{requestId}/status
@@ -93,6 +93,7 @@ sequenceDiagram
     "requestId": "4A1F8C9E2B0D7E3A",
     "token": "4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
     "phoneNumber": "+94771234567",
+    "recipientNumber": "+94703003332",
     "smsContent": "4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
     "expiresAt": "2026-10-15T15:15:00Z"
   }
