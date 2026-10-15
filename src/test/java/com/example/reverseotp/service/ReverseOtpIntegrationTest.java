@@ -58,7 +58,7 @@ class ReverseOtpIntegrationTest {
         assertTrue(tokenResp.getToken().matches("^[0-9A-F]{64}$"));
         assertTrue(tokenResp.getToken().startsWith(tokenResp.getRequestId()));
         assertEquals(phone, tokenResp.getPhoneNumber());
-        assertEquals("Your device token is: " + tokenResp.getToken(), tokenResp.getSmsContent());
+        assertEquals(tokenResp.getToken(), tokenResp.getSmsContent());
 
         // Check TokenRequest table in H2
         TokenRequest storedRequest = tokenRequestRepository.findByRequestId(tokenResp.getRequestId()).orElse(null);

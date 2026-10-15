@@ -12,7 +12,7 @@ app:
     ttl-minutes: 5
     request-id-length: 16
     suffix-length: 48
-    sms-template: "Your device token is: %s"
+    sms-template: "%s"
 
 management:
   endpoints:

@@ -139,7 +139,7 @@ public class WebhookService {
         if (content == null) {
             return null;
         }
-        String cleaned = content.replaceAll("\\s+", "").toUpperCase();
+        String cleaned = content.replaceAll("[\\s\"'\\`]", "").toUpperCase();
         if (cleaned.length() < REQUEST_ID_LENGTH) {
             return null;
         }

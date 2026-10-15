@@ -39,7 +39,7 @@ public class TokenService {
     @Value("${app.token.suffix-length:48}")
     private int suffixLength;
 
-    @Value("${app.token.sms-template:Your device token is: %s}")
+    @Value("${app.token.sms-template:%s}")
     private String smsTemplate;
 
     public TokenService(TokenRequestRepository tokenRequestRepository) {
