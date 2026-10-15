@@ -6,6 +6,21 @@ spring:
     name: reverse-otp-service
   profiles:
     active: dev
+  datasource:
+    url: jdbc:h2:mem:reverse_otp_db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driverClassName: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        show_sql: false
+        format_sql: false
+        use_sql_comments: false
 
 app:
   token:
@@ -22,3 +37,15 @@ management:
   endpoint:
     health:
       show-details: always
+
+logging:
+  level:
+    root: INFO
+    org.hibernate: ERROR
+    org.hibernate.SQL: OFF
+    org.hibernate.type.descriptor.sql: OFF
+    org.hibernate.orm.jdbc.bind: OFF
+    org.hibernate.orm.jdbc.extract: OFF
+    org.springframework.orm.jpa: WARN
+    org.springframework.jdbc: WARN
+    com.example.reverseotp: INFO

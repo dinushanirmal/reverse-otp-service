@@ -113,6 +113,8 @@ public class TokenService {
             log.info("Token request {} marked as EXPIRED during status check", sanitizedId);
         }
 
+        log.info("Token status checked: requestId={}, status={}", sanitizedId, tokenRequest.getStatus());
+
         return new TokenStatusResponse(
                 tokenRequest.getRequestId(),
                 tokenRequest.getPhoneNumber(),
