@@ -48,7 +48,7 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
     "requestId": "4A1F8C9E2B0D7E3A",
     "token": "4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
     "phoneNumber": "+94771234567",
-    "smsContent": "Your verification token is: 4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
+    "smsContent": "Your device token is: 4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
     "expiresAt": "2026-10-15T15:15:00Z"
   }
   ```

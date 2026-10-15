@@ -39,6 +39,9 @@ public class TokenService {
     @Value("${app.token.suffix-length:48}")
     private int suffixLength;
 
+    @Value("${app.token.sms-template:Your device token is: %s}")
+    private String smsTemplate;
+
     public TokenService(TokenRequestRepository tokenRequestRepository) {
         this.tokenRequestRepository = tokenRequestRepository;
     }
@@ -82,7 +85,9 @@ public class TokenService {
         log.info("Generated token request: requestId={}, phone={}, length={}, expiresAt={}",
                 requestId, normalizedPhone, fullToken.length(), expiresAt);
 
-        String smsContent = "Your verification token is: " + fullToken;
+        String smsContent = smsTemplate.contains("%s")
+                ? String.format(smsTemplate, fullToken)
+                : smsTemplate + fullToken;
 
         return new GenerateTokenResponse(requestId, fullToken, normalizedPhone, smsContent, expiresAt);
     }
