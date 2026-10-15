@@ -12,29 +12,49 @@
 
 This service implements **Reverse OTP (Mobile-Originated / MO SMS)** phone number verification:
 
-```text
-[Client / App]                   [Reverse OTP Service]                 [Telco Gateway]
-      |                                    |                                  |
-      | 1. POST /api/v1/tokens/generate    |                                  |
-      |----------------------------------->|                                  |
-      |   (Returns 64-hex token)           |                                  |
-      |<-----------------------------------|                                  |
-      |                                    |                                  |
-      | 2. GET /api/v1/tokens/{id}/status  |                                  |
-      |    (Status: PENDING)               |                                  |
-      |                                    |                                  |
-      | [User sends SMS with token] ------>---------------------------------->|
-      |                                    |                                  |
-      |                                    | 3. POST /api/v1/webhooks/telco/sms|
-      |                                    |<---------------------------------|
-      |                                    | (Matches 16-char ID + Phone)     |
-      |                                    | (Marks status: APPROVED)         |
-      |                                    | (Returns HTTP 200 {status:RCVD}) |
-      |                                    |--------------------------------->|
-      |                                    |                                  |
-      | 4. GET /api/v1/tokens/{id}/status  |                                  |
-      |    (Status: APPROVED)              |                                  |
-      |<-----------------------------------|                                  |
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as User / SIM Device
+    participant Client as Client Application
+    participant API as Reverse OTP Service
+    participant DB as H2 Database
+    participant Telco as Telco Provider Gateway
+
+    Note over Client,API: 1. Token Request
+    Client->>API: POST /api/v1/tokens/generate { phoneNumber: "+94771234567" }
+    API->>API: Generate 16-char requestId & 48-char hex suffix (64-char hex total)
+    API->>DB: INSERT token_requests (requestId, token, status: PENDING, expiresAt: now+5m)
+    API-->>Client: 201 Created { requestId, token, smsContent: "<64-hex-token>" }
+
+    Note over Client,User: 2. Mobile-Originated (MO) SMS Dispatch
+    Client->>User: Launch SMS intent (pre-fills plain 64-hex token to Telco shortcode)
+    User->>Telco: Send SMS (<64-hex-token>)
+
+    Note over Client,API: 3. Initial Polling
+    Client->>API: GET /api/v1/tokens/{requestId}/status
+    API->>DB: SELECT status FROM token_requests WHERE requestId = ?
+    API-->>Client: 200 OK { status: "PENDING" }
+
+    Note over Telco,API: 4. Telco Webhook Callback
+    Telco->>API: POST /api/v1/webhooks/telco/sms { sender: "+94771234567", message: "<64-hex-token>" }
+    API->>DB: INSERT incoming_messages (senderNumber, rawContent, receivedAt)
+    API->>API: Extract first 16 chars as requestId
+    API->>DB: SELECT * FROM token_requests WHERE requestId = ?
+
+    alt Token Valid, Sender Matches & PENDING
+        API->>DB: UPDATE token_requests SET status = "APPROVED", verified_at = now()
+        API->>DB: UPDATE incoming_messages SET matched = true, match_status = "APPROVED"
+        API-->>Telco: 200 OK { status: "RECEIVED", message: "SMS received successfully" }
+    else Phone Mismatch or Expired
+        API->>DB: UPDATE incoming_messages SET matched = false, match_status = "PHONE_MISMATCH" / "EXPIRED"
+        API-->>Telco: 200 OK { status: "RECEIVED", message: "SMS received successfully" }
+    end
+
+    Note over Client,API: 5. Final Polling (Verification Success)
+    Client->>API: GET /api/v1/tokens/{requestId}/status
+    API->>DB: SELECT status, verified_at FROM token_requests WHERE requestId = ?
+    API-->>Client: 200 OK { status: "APPROVED", verifiedAt: "2026-10-15T..." }
 ```
 
 ---

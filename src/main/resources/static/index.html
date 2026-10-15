@@ -156,6 +156,52 @@
             <li><strong>Telco notifies webhook:</strong> Telco sends the SMS content and sender's number. The service matches against pending requests and updates status to <code>APPROVED</code>.</li>
             <li><strong>Client polls status:</strong> Client checks verification status using the 16-character Request ID.</li>
         </ol>
+
+        <h3>Protocol Sequence Flow</h3>
+        <div class="mermaid" style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0;">
+sequenceDiagram
+    autonumber
+    actor User as User / SIM Device
+    participant Client as Client Application
+    participant API as Reverse OTP Service
+    participant DB as H2 Database
+    participant Telco as Telco Provider Gateway
+
+    Note over Client,API: 1. Token Request
+    Client->>API: POST /api/v1/tokens/generate { phoneNumber: "+9477..." }
+    API->>API: Generate 16-char requestId & 48-char hex suffix (64-char hex total)
+    API->>DB: INSERT token_requests (requestId, token, status: PENDING, expiresAt: now+5m)
+    API-->>Client: 201 Created { requestId, token, smsContent: "<64-hex-token>" }
+
+    Note over Client,User: 2. Mobile-Originated (MO) SMS Dispatch
+    Client->>User: Launch SMS intent (plain 64-hex token to Telco shortcode)
+    User->>Telco: Send SMS (<64-hex-token>)
+
+    Note over Client,API: 3. Initial Polling
+    Client->>API: GET /api/v1/tokens/{requestId}/status
+    API->>DB: SELECT status FROM token_requests WHERE requestId = ?
+    API-->>Client: 200 OK { status: "PENDING" }
+
+    Note over Telco,API: 4. Telco Webhook Callback
+    Telco->>API: POST /api/v1/webhooks/telco/sms { sender: "+9477...", message: "<64-hex-token>" }
+    API->>DB: INSERT incoming_messages (senderNumber, rawContent, receivedAt)
+    API->>API: Extract first 16 chars as requestId
+    API->>DB: SELECT * FROM token_requests WHERE requestId = ?
+
+    alt Token Valid, Sender Matches & PENDING
+        API->>DB: UPDATE token_requests SET status = "APPROVED", verified_at = now()
+        API->>DB: UPDATE incoming_messages SET matched = true, match_status = "APPROVED"
+        API-->>Telco: 200 OK { status: "RECEIVED", message: "SMS received successfully" }
+    else Phone Mismatch or Expired
+        API->>DB: UPDATE incoming_messages SET matched = false, match_status = "PHONE_MISMATCH" / "EXPIRED"
+        API-->>Telco: 200 OK { status: "RECEIVED", message: "SMS received successfully" }
+    end
+
+    Note over Client,API: 5. Final Polling (Verification Success)
+    Client->>API: GET /api/v1/tokens/{requestId}/status
+    API->>DB: SELECT status, verified_at FROM token_requests WHERE requestId = ?
+    API-->>Client: 200 OK { status: "APPROVED", verifiedAt: "2026-10-15T..." }
+        </div>
     </section>
 
     <section>
@@ -254,5 +300,10 @@ curl -X POST http://localhost:8080/api/v1/webhooks/telco/sms \
   -d '{"sender": "+94771234567", "message": "{token}"}'</code></pre>
     </section>
 </div>
+<script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    mermaid.initialize({ startOnLoad: true, theme: isDark ? 'dark' : 'default' });
+</script>
 </body>
 </html>
