@@ -3,8 +3,8 @@ package com.example.reverseotp.service;
 import com.example.reverseotp.dto.request.GenerateTokenRequest;
 import com.example.reverseotp.dto.request.TelcoWebhookRequest;
 import com.example.reverseotp.dto.response.GenerateTokenResponse;
+import com.example.reverseotp.dto.response.TelcoWebhookResponse;
 import com.example.reverseotp.dto.response.TokenStatusResponse;
-import com.example.reverseotp.dto.response.WebhookProcessResponse;
 import com.example.reverseotp.entity.IncomingMessage;
 import com.example.reverseotp.entity.MatchStatus;
 import com.example.reverseotp.entity.TokenRequest;
@@ -47,17 +47,19 @@ class ReverseOtpIntegrationTest {
 
     @Test
     void testCompleteSuccessfulFlow() {
-        // 1. Generate Token
+        // 1. Generate Token (64-char pure hex)
         String phone = "+94771234567";
         GenerateTokenResponse tokenResp = tokenService.generateToken(new GenerateTokenRequest(phone));
 
         assertNotNull(tokenResp);
         assertNotNull(tokenResp.getRequestId());
         assertEquals(16, tokenResp.getRequestId().length());
+        assertEquals(64, tokenResp.getToken().length());
+        assertTrue(tokenResp.getToken().matches("^[0-9A-F]{64}$"));
         assertTrue(tokenResp.getToken().startsWith(tokenResp.getRequestId()));
         assertEquals(phone, tokenResp.getPhoneNumber());
 
-        // Check TokenRequest table
+        // Check TokenRequest table in H2
         TokenRequest storedRequest = tokenRequestRepository.findByRequestId(tokenResp.getRequestId()).orElse(null);
         assertNotNull(storedRequest);
         assertEquals(TokenStatus.PENDING, storedRequest.getStatus());
@@ -68,20 +70,20 @@ class ReverseOtpIntegrationTest {
         assertEquals(TokenStatus.PENDING, statusResp1.getStatus());
         assertEquals(phone, statusResp1.getPhoneNumber());
 
-        // 2. Telco sends webhook for matching SMS (first 16 chars is the requestId)
+        // 2. Telco sends webhook for matching SMS (receives simple acknowledgement)
         TelcoWebhookRequest webhookReq = new TelcoWebhookRequest("94771234567", tokenResp.getToken());
-        WebhookProcessResponse webhookResp = webhookService.processIncomingSms(webhookReq);
+        TelcoWebhookResponse webhookResp = webhookService.processIncomingSms(webhookReq);
 
-        assertTrue(webhookResp.isMatched());
-        assertEquals(MatchStatus.APPROVED, webhookResp.getMatchStatus());
-        assertEquals(tokenResp.getRequestId(), webhookResp.getExtractedRequestId());
+        assertNotNull(webhookResp);
+        assertEquals("RECEIVED", webhookResp.getStatus());
 
-        // Check incoming_messages table
+        // Check incoming_messages table records internal match outcome
         List<IncomingMessage> incomingList = incomingMessageRepository.findAll();
         assertEquals(1, incomingList.size());
         IncomingMessage incomingMsg = incomingList.get(0);
         assertTrue(incomingMsg.isMatched());
         assertEquals(MatchStatus.APPROVED, incomingMsg.getMatchStatus());
+        assertEquals(tokenResp.getRequestId(), incomingMsg.getExtractedRequestId());
 
         // 3. Check status API after webhook -> should be APPROVED with audit data
         TokenStatusResponse statusResp2 = tokenService.getTokenStatus(tokenResp.getRequestId());
@@ -96,23 +98,26 @@ class ReverseOtpIntegrationTest {
     }
 
     @Test
-    void testWebhookPhoneMismatchFails() {
+    void testWebhookPhoneMismatchFailsInternalMatch() {
         // Generate Token for phone A
         GenerateTokenResponse tokenResp = tokenService.generateToken(new GenerateTokenRequest("+94771111111"));
 
         // Webhook comes from phone B with the same token
         TelcoWebhookRequest webhookReq = new TelcoWebhookRequest("+94772222222", tokenResp.getToken());
-        WebhookProcessResponse webhookResp = webhookService.processIncomingSms(webhookReq);
+        TelcoWebhookResponse webhookResp = webhookService.processIncomingSms(webhookReq);
 
-        assertFalse(webhookResp.isMatched());
-        assertEquals(MatchStatus.PHONE_MISMATCH, webhookResp.getMatchStatus());
+        // Telco receives standard receipt ACK
+        assertEquals("RECEIVED", webhookResp.getStatus());
 
-        // Status should still be PENDING
+        // Status should still be PENDING in token_requests
         TokenStatusResponse statusResp = tokenService.getTokenStatus(tokenResp.getRequestId());
         assertEquals(TokenStatus.PENDING, statusResp.getStatus());
 
-        // Incoming message was still stored
-        assertEquals(1, incomingMessageRepository.count());
+        // Incoming message was stored with PHONE_MISMATCH
+        List<IncomingMessage> messages = incomingMessageRepository.findAll();
+        assertEquals(1, messages.size());
+        assertFalse(messages.get(0).isMatched());
+        assertEquals(MatchStatus.PHONE_MISMATCH, messages.get(0).getMatchStatus());
     }
 
     @Test
@@ -127,25 +132,32 @@ class ReverseOtpIntegrationTest {
 
         // Webhook arrives
         TelcoWebhookRequest webhookReq = new TelcoWebhookRequest("+94771234567", tokenResp.getToken());
-        WebhookProcessResponse webhookResp = webhookService.processIncomingSms(webhookReq);
+        TelcoWebhookResponse webhookResp = webhookService.processIncomingSms(webhookReq);
 
-        assertFalse(webhookResp.isMatched());
-        assertEquals(MatchStatus.EXPIRED, webhookResp.getMatchStatus());
+        assertEquals("RECEIVED", webhookResp.getStatus());
 
         // Status should now be EXPIRED
         TokenStatusResponse statusResp = tokenService.getTokenStatus(tokenResp.getRequestId());
         assertEquals(TokenStatus.EXPIRED, statusResp.getStatus());
+
+        // Incoming message recorded as EXPIRED
+        List<IncomingMessage> messages = incomingMessageRepository.findAll();
+        assertEquals(1, messages.size());
+        assertFalse(messages.get(0).isMatched());
+        assertEquals(MatchStatus.EXPIRED, messages.get(0).getMatchStatus());
     }
 
     @Test
     void testWebhookUnknownRequestId() {
-        TelcoWebhookRequest webhookReq = new TelcoWebhookRequest("+94771234567", "UNKNOWNREQUESTID123-555");
-        WebhookProcessResponse webhookResp = webhookService.processIncomingSms(webhookReq);
+        TelcoWebhookRequest webhookReq = new TelcoWebhookRequest("+94771234567", "0123456789ABCDEF0123456789ABCDEF");
+        TelcoWebhookResponse webhookResp = webhookService.processIncomingSms(webhookReq);
 
-        assertFalse(webhookResp.isMatched());
-        assertEquals(MatchStatus.TOKEN_NOT_FOUND, webhookResp.getMatchStatus());
+        assertEquals("RECEIVED", webhookResp.getStatus());
 
         // Message should be stored in incoming_messages
-        assertEquals(1, incomingMessageRepository.count());
+        List<IncomingMessage> messages = incomingMessageRepository.findAll();
+        assertEquals(1, messages.size());
+        assertFalse(messages.get(0).isMatched());
+        assertEquals(MatchStatus.TOKEN_NOT_FOUND, messages.get(0).getMatchStatus());
     }
 }

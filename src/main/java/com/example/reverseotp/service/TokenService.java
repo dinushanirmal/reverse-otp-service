@@ -22,7 +22,7 @@ import java.time.Instant;
 public class TokenService {
 
     private static final Logger log = LoggerFactory.getLogger(TokenService.class);
-    private static final String ALPHANUMERIC = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    private static final String HEX_CHARS = "0123456789ABCDEF";
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final TokenRequestRepository tokenRequestRepository;
@@ -30,25 +30,31 @@ public class TokenService {
     @Value("${app.token.ttl-minutes:5}")
     private long ttlMinutes;
 
+    @Value("${app.token.request-id-length:16}")
+    private int requestIdLength;
+
+    @Value("${app.token.suffix-length:48}")
+    private int suffixLength;
+
     public TokenService(TokenRequestRepository tokenRequestRepository) {
         this.tokenRequestRepository = tokenRequestRepository;
     }
 
     /**
-     * Generates a unique 16-char prefixed token (< 160 chars) and persists it in token_requests.
+     * Generates a unique 16-char hex prefixed token (64 hex chars total, < 160 chars) and persists it in token_requests.
      */
     @Transactional
     public GenerateTokenResponse generateToken(GenerateTokenRequest request) {
         String normalizedPhone = PhoneNumberUtil.normalize(request.getPhoneNumber());
 
-        // Generate a 16-character uppercase alphanumeric Request ID
-        String requestId = generateRandomString(16);
+        // Generate 16-character uppercase hex Request ID
+        String requestId = generateRandomHex(requestIdLength);
 
-        // Generate 6-digit random verification suffix
-        String suffix = String.format("%06d", RANDOM.nextInt(1_000_000));
+        // Generate hex random suffix (default 48 hex chars)
+        String hexSuffix = generateRandomHex(suffixLength);
 
-        // Full token starts with first 16 characters as requestId
-        String fullToken = requestId + "-" + suffix;
+        // Full token is pure hex where first 16 characters are requestId
+        String fullToken = requestId + hexSuffix;
 
         Instant now = Instant.now();
         Instant expiresAt = now.plus(Duration.ofMinutes(ttlMinutes));
@@ -63,7 +69,8 @@ public class TokenService {
         );
 
         tokenRequestRepository.save(tokenRequest);
-        log.info("Generated token request: requestId={}, phone={}, expiresAt={}", requestId, normalizedPhone, expiresAt);
+        log.info("Generated token request: requestId={}, phone={}, length={}, expiresAt={}",
+                requestId, normalizedPhone, fullToken.length(), expiresAt);
 
         String smsContent = "Your verification token is: " + fullToken;
 
@@ -101,10 +108,10 @@ public class TokenService {
         );
     }
 
-    private String generateRandomString(int length) {
+    private String generateRandomHex(int length) {
         StringBuilder sb = new StringBuilder(length);
         for (int i = 0; i < length; i++) {
-            sb.append(ALPHANUMERIC.charAt(RANDOM.nextInt(ALPHANUMERIC.length())));
+            sb.append(HEX_CHARS.charAt(RANDOM.nextInt(HEX_CHARS.length())));
         }
         return sb.toString();
     }

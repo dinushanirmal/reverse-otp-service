@@ -11,7 +11,7 @@ app:
   token:
     ttl-minutes: 5
     request-id-length: 16
-    suffix-length: 8
+    suffix-length: 48
 
 springdoc:
   swagger-ui:

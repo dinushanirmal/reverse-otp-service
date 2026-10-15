@@ -1,7 +1,7 @@
 package com.example.reverseotp.service;
 
 import com.example.reverseotp.dto.request.TelcoWebhookRequest;
-import com.example.reverseotp.dto.response.WebhookProcessResponse;
+import com.example.reverseotp.dto.response.TelcoWebhookResponse;
 import com.example.reverseotp.entity.IncomingMessage;
 import com.example.reverseotp.entity.MatchStatus;
 import com.example.reverseotp.entity.TokenRequest;
@@ -38,9 +38,10 @@ public class WebhookService {
      * 2. Extracts request ID from first 16 characters.
      * 3. Checks for matching token request in token_requests for same request ID and phone number.
      * 4. If matched and pending, marks as APPROVED with audit details.
+     * 5. Returns simple receipt acknowledgment to telco (no internal match status exposed).
      */
     @Transactional
-    public WebhookProcessResponse processIncomingSms(TelcoWebhookRequest request) {
+    public TelcoWebhookResponse processIncomingSms(TelcoWebhookRequest request) {
         String rawContent = request.getMessage() != null ? request.getMessage().trim() : "";
         String senderNumber = PhoneNumberUtil.normalize(request.getSender());
 
@@ -67,13 +68,7 @@ public class WebhookService {
             incomingMessage.setMatched(false);
             incomingMessage.setMatchStatus(MatchStatus.TOKEN_NOT_FOUND);
             incomingMessageRepository.save(incomingMessage);
-            return new WebhookProcessResponse(
-                    incomingMessage.getId(),
-                    extractedRequestId,
-                    false,
-                    MatchStatus.TOKEN_NOT_FOUND,
-                    "Message content must contain at least 16 characters for Request ID"
-            );
+            return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
         }
 
         // 3. Check for matching token request
@@ -85,13 +80,7 @@ public class WebhookService {
             incomingMessageRepository.save(incomingMessage);
             log.warn("No token request found for requestId={}", extractedRequestId);
 
-            return new WebhookProcessResponse(
-                    incomingMessage.getId(),
-                    extractedRequestId,
-                    false,
-                    MatchStatus.TOKEN_NOT_FOUND,
-                    "No token request found for the provided Request ID"
-            );
+            return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
         }
 
         TokenRequest tokenRequest = tokenOpt.get();
@@ -106,13 +95,7 @@ public class WebhookService {
             incomingMessageRepository.save(incomingMessage);
             log.warn("Token request {} has expired", extractedRequestId);
 
-            return new WebhookProcessResponse(
-                    incomingMessage.getId(),
-                    extractedRequestId,
-                    false,
-                    MatchStatus.EXPIRED,
-                    "Token request has expired"
-            );
+            return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
         }
 
         // Check if already approved (idempotency check)
@@ -120,15 +103,9 @@ public class WebhookService {
             incomingMessage.setMatched(true);
             incomingMessage.setMatchStatus(MatchStatus.ALREADY_APPROVED);
             incomingMessageRepository.save(incomingMessage);
-            log.info("Token request {} is already approved", extractedRequestId);
+            log.info("Token request {} was already approved", extractedRequestId);
 
-            return new WebhookProcessResponse(
-                    incomingMessage.getId(),
-                    extractedRequestId,
-                    true,
-                    MatchStatus.ALREADY_APPROVED,
-                    "Token was already verified and approved"
-            );
+            return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
         }
 
         // Verify phone number match
@@ -139,13 +116,7 @@ public class WebhookService {
             log.warn("Phone number mismatch for requestId={}: expected={}, actual={}",
                     extractedRequestId, tokenRequest.getPhoneNumber(), senderNumber);
 
-            return new WebhookProcessResponse(
-                    incomingMessage.getId(),
-                    extractedRequestId,
-                    false,
-                    MatchStatus.PHONE_MISMATCH,
-                    "Sender phone number does not match registered phone number"
-            );
+            return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
         }
 
         // Token is valid and pending! Mark as APPROVED with audit details
@@ -160,19 +131,18 @@ public class WebhookService {
 
         log.info("Successfully approved token request {} for phone {}", extractedRequestId, senderNumber);
 
-        return new WebhookProcessResponse(
-                incomingMessage.getId(),
-                extractedRequestId,
-                true,
-                MatchStatus.APPROVED,
-                "Token matched and approved successfully"
-        );
+        // Standard simple acknowledgment to telco
+        return new TelcoWebhookResponse("RECEIVED", "SMS received successfully");
     }
 
     private String extractRequestId(String content) {
-        if (content == null || content.length() < REQUEST_ID_LENGTH) {
+        if (content == null) {
             return null;
         }
-        return content.substring(0, REQUEST_ID_LENGTH).toUpperCase();
+        String cleaned = content.replaceAll("\\s+", "").toUpperCase();
+        if (cleaned.length() < REQUEST_ID_LENGTH) {
+            return null;
+        }
+        return cleaned.substring(0, REQUEST_ID_LENGTH);
     }
 }

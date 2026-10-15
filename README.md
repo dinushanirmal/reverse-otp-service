@@ -7,15 +7,16 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
 ## 🚀 How It Works
 
 1. **Client / App requests a token:**
-   Client provides a phone number. The service generates a unique token where the **first 16 characters are the unique Request ID**, and stores it in the `token_requests` table with `PENDING` status.
+   Client provides a phone number. The service generates a 64-character uppercase **pure hex** token where the **first 16 characters are the unique Request ID**, and stores it in the `token_requests` table with `PENDING` status.
 2. **User sends SMS:**
    The user or app sends an SMS containing the token to the Telco shortcode.
 3. **Telco calls Webhook:**
-   The telco webhook notifies this service with the SMS content and sender's phone number. The service:
-   - Stores raw message in `incoming_messages`.
+   The telco webhook forwards the SMS content and sender's phone number. The service:
+   - Stores the raw message in `incoming_messages`.
    - Extracts the first 16 characters as the Request ID.
    - Matches against pending token requests for the same phone number.
    - If matched, marks as `APPROVED` with audit fields (`verified_at`, `incoming_message_id`).
+   - Immediately returns a standard receipt acknowledgment to the telco (`{"status": "RECEIVED"}`).
 4. **Client polls status:**
    Client queries status with the Request ID to confirm approval.
 
@@ -44,11 +45,11 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
 - **Response (201 Created):**
   ```json
   {
-    "requestId": "W8X2M4P7Q1K9R5T3",
-    "token": "W8X2M4P7Q1K9R5T3-492019",
+    "requestId": "4A1F8C9E2B0D7E3A",
+    "token": "4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
     "phoneNumber": "+94771234567",
-    "smsContent": "Your verification token is: W8X2M4P7Q1K9R5T3-492019",
-    "expiresAt": "2026-10-15T08:15:00Z"
+    "smsContent": "Your verification token is: 4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C",
+    "expiresAt": "2026-10-15T15:15:00Z"
   }
   ```
 
@@ -58,17 +59,14 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
   ```json
   {
     "sender": "+94771234567",
-    "message": "W8X2M4P7Q1K9R5T3-492019"
+    "message": "4A1F8C9E2B0D7E3A9F5C1B8E3D7A2F0E6D9C5B1A8E4F2D0B7A9E5C3D1F8A6B2C"
   }
   ```
 - **Response (200 OK):**
   ```json
   {
-    "incomingMessageId": 1,
-    "extractedRequestId": "W8X2M4P7Q1K9R5T3",
-    "matched": true,
-    "matchStatus": "APPROVED",
-    "message": "Token matched and approved successfully"
+    "status": "RECEIVED",
+    "message": "SMS received successfully"
   }
   ```
 
@@ -77,12 +75,12 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
 - **Response (200 OK):**
   ```json
   {
-    "requestId": "W8X2M4P7Q1K9R5T3",
+    "requestId": "4A1F8C9E2B0D7E3A",
     "phoneNumber": "+94771234567",
     "status": "APPROVED",
-    "createdAt": "2026-10-15T08:10:00Z",
-    "expiresAt": "2026-10-15T08:15:00Z",
-    "verifiedAt": "2026-10-15T08:11:30Z"
+    "createdAt": "2026-10-15T15:10:00Z",
+    "expiresAt": "2026-10-15T15:15:00Z",
+    "verifiedAt": "2026-10-15T15:11:30Z"
   }
   ```
 
@@ -91,9 +89,9 @@ A Spring Boot service providing **Reverse OTP (Mobile-Originated SMS)** verifica
 ## 🗄 Database Tables (In-Memory H2)
 
 ### `token_requests`
-- `request_id` (PK, 16 chars)
+- `request_id` (PK, 16 hex chars)
 - `phone_number`
-- `token` (< 160 chars)
+- `token` (64 hex chars, < 160 chars)
 - `status` (`PENDING`, `APPROVED`, `EXPIRED`)
 - `expires_at`
 - `created_at`

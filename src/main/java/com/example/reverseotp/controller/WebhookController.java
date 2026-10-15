@@ -1,7 +1,7 @@
 package com.example.reverseotp.controller;
 
 import com.example.reverseotp.dto.request.TelcoWebhookRequest;
-import com.example.reverseotp.dto.response.WebhookProcessResponse;
+import com.example.reverseotp.dto.response.TelcoWebhookResponse;
 import com.example.reverseotp.service.WebhookService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -27,10 +27,10 @@ public class WebhookController {
     @PostMapping("/telco/sms")
     @Operation(summary = "Receive incoming SMS from telco provider",
             description = "Stores incoming message in incoming_messages, matches the first 16 chars with pending token requests, and updates approval status.")
-    @ApiResponse(responseCode = "200", description = "Webhook processed successfully")
+    @ApiResponse(responseCode = "200", description = "Webhook acknowledged successfully")
     @ApiResponse(responseCode = "400", description = "Invalid payload")
-    public ResponseEntity<WebhookProcessResponse> receiveSms(@Valid @RequestBody TelcoWebhookRequest request) {
-        WebhookProcessResponse response = webhookService.processIncomingSms(request);
+    public ResponseEntity<TelcoWebhookResponse> receiveSms(@Valid @RequestBody TelcoWebhookRequest request) {
+        TelcoWebhookResponse response = webhookService.processIncomingSms(request);
         return ResponseEntity.ok(response);
     }
 }
